@@ -1,0 +1,18 @@
+name: Refresh pkg.go.dev
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger pkg.go.dev re-index
+        run: |
+          MODULE="github.com/xiaohao0725/logs-sdk-go"
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "Refreshing ${MODULE}@${VERSION}..."
+          # 通过 Go proxy 拉取，触发 pkg.go.dev 重新抓取
+          GOPROXY=https://proxy.golang.org,direct go list -m ${MODULE}@${VERSION}
+          echo "Done. Visit https://pkg.go.dev/${MODULE}"
