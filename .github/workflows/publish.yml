@@ -3,6 +3,7 @@ name: Refresh pkg.go.dev
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   refresh:
