@@ -2,6 +2,7 @@ package logsdk
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -142,6 +143,13 @@ func (c *Client) buildEntry(ctx *gin.Context, entryUUID string, startTime time.T
 		Host:             getHostname(),
 		ProcessID:        strconv.Itoa(osGetpid()),
 		Tags:             map[string]interface{}{},
+		TLSVersion:       getTLSVersion(ctx.Request),
+		TLSCipher:        getTLSCipher(ctx.Request),
+		Proto:            ctx.Request.Proto,
+		APIVersion:       extractAPIVersion(ctx.Request.URL.Path),
+		Referer:          ctx.Request.Header.Get("Referer"),
+		LatencyBreakdown: "{}",
+		RequestID:        entryUUID[:8],
 	}
 }
 
@@ -182,6 +190,13 @@ func (c *Client) buildStandardEntry(r *http.Request, w *responseWriter, entryUUI
 		Host:             getHostname(),
 		ProcessID:        strconv.Itoa(osGetpid()),
 		Tags:             map[string]interface{}{},
+		TLSVersion:       getTLSVersion(r),
+		TLSCipher:        getTLSCipher(r),
+		Proto:            r.Proto,
+		APIVersion:       extractAPIVersion(r.URL.Path),
+		Referer:          r.Header.Get("Referer"),
+		LatencyBreakdown: "{}",
+		RequestID:        entryUUID[:8],
 	}
 }
 
@@ -420,4 +435,41 @@ var osHostname = os.Hostname
 func getHostname() string {
 	host, _ := osHostname()
 	return host
+}
+
+// ──────────────── 新增辅助函数 ────────────────
+
+// getTLSVersion 获取 TLS 版本。
+func getTLSVersion(r *http.Request) string {
+	if r.TLS != nil {
+		switch r.TLS.Version {
+		case 0x0304: return "1.3"
+		case 0x0303: return "1.2"
+		case 0x0302: return "1.1"
+		case 0x0301: return "1.0"
+		default: return fmt.Sprintf("0x%04x", r.TLS.Version)
+		}
+	}
+	return ""
+}
+
+// getTLSCipher 获取 TLS 密码套件名称。
+func getTLSCipher(r *http.Request) string {
+	if r.TLS != nil {
+		return tls.CipherSuiteName(r.TLS.CipherSuite)
+	}
+	return ""
+}
+
+// extractAPIVersion 从路径提取 API 版本。
+// 匹配 /api/v1/... → v1, /api/v2/... → v2
+func extractAPIVersion(path string) string {
+	for i := 0; i < len(path)-5; i++ {
+		if path[i:i+5] == "/api/" && i+7 < len(path) && path[i+5] == 'v' {
+			end := i + 7
+			for end < len(path) && path[end] != '/' { end++ }
+			return path[i+5 : end]
+		}
+	}
+	return ""
 }

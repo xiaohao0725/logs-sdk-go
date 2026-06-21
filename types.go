@@ -111,6 +111,15 @@ type LogEntry struct {
 	Host        string `json:"host"`         // 来源主机名
 	ProcessID   string `json:"process_id"`   // 进程 PID
 
+	// ── TLS/协议 ──
+	TLSVersion       string `json:"tls_version"`       // TLS版本: 1.2/1.3
+	TLSCipher        string `json:"tls_cipher"`        // TLS密码套件
+	Proto            string `json:"proto"`             // HTTP协议版本
+	APIVersion       string `json:"api_version"`       // API版本
+	Referer          string `json:"referer"`           // HTTP Referer
+	UpstreamStatus   int    `json:"upstream_status"`   // 上游状态码
+	LatencyBreakdown string `json:"latency_breakdown"` // 耗时分解JSON
+	RequestID        string `json:"request_id"`        // 短请求ID
 	// ── 自定义扩展 ──
 	Tags map[string]interface{} `json:"tags"` // 自定义标签
 }
