@@ -1,0 +1,8 @@
+# Go SDK .gitignore
+*.exe
+*.test
+*.out
+vendor/
+.idea/
+.vscode/
+*.swp
