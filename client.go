@@ -25,6 +25,9 @@ type Client struct {
 	closed       bool
 	closedMu     sync.Mutex
 
+	// 离线缓存
+	offlineCache *OfflineCache
+
 	// 传参
 	maxBodySize  int
 	maxStackSize int
@@ -47,6 +50,7 @@ func New(cfg Config) (*Client, error) {
 		httpClient:   &http.Client{Timeout: 15 * time.Second},
 		ctx:          ctx,
 		cancel:       cancel,
+		offlineCache: NewOfflineCache(""), // 使用系统临时目录
 		maxBodySize:  config.MaxBodySize,
 		maxStackSize: config.MaxStackSize,
 		hostname:     hostname,
@@ -63,6 +67,18 @@ func New(cfg Config) (*Client, error) {
 	go client.flushLoop()
 
 	return client, nil
+}
+
+// FlushOffline 尝试重传所有本地离线缓存的日志。
+// 建议 Client 启动后调用，恢复断网期间缓存的日志。
+func (c *Client) FlushOffline() {
+	if c.offlineCache.PendingCount() == 0 { return }
+	log.Printf("[logs-sdk] 检测到 %d 个离线缓存文件，开始重传...", c.offlineCache.PendingCount())
+	if err := c.offlineCache.FlushAll(c.sendBatch); err != nil {
+		log.Printf("[logs-sdk] 离线缓存重传失败: %v", err)
+	} else {
+		log.Printf("[logs-sdk] 离线缓存重传完成")
+	}
 }
 
 // Send 异步发送一条日志条目到缓冲区。
@@ -102,9 +118,13 @@ func (c *Client) Close() {
 	remaining := c.buffer.flush()
 	if len(remaining) > 0 {
 		if err := c.sendBatch(remaining); err != nil {
-			log.Printf("[logs-sdk] 关闭时上报失败 (数量=%d): %v", len(remaining), err)
+			log.Printf("[logs-sdk] 关闭时上报失败 (数量=%d): %v — 保存到离线缓存", len(remaining), err)
+			c.offlineCache.Save(remaining)
 		}
 	}
+
+	// 尝试重传离线缓存
+	c.FlushOffline()
 }
 
 // ──────────────── 内部方法 ────────────────
@@ -139,7 +159,11 @@ func (c *Client) flushEntries(entries []*LogEntry) {
 		return c.sendBatch(entries)
 	})
 	if err != nil {
-		log.Printf("[logs-sdk] 上报失败 (数量=%d，已重试): %v", len(entries), err)
+		log.Printf("[logs-sdk] 上报失败 (数量=%d，已重试): %v — 保存到离线缓存", len(entries), err)
+		// 发送失败时自动缓存到本地，恢复后重传
+		if saveErr := c.offlineCache.Save(entries); saveErr != nil {
+			log.Printf("[logs-sdk] 离线缓存保存失败: %v", saveErr)
+		}
 	}
 }
 
