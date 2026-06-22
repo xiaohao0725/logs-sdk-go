@@ -192,6 +192,7 @@ func (c *Client) sendBatch(entries []*LogEntry) error {
 	req.Header.Set("X-API-Secret", c.config.APISecret)
 	req.Header.Set("X-SDK-Version", Version)
 	req.Header.Set("X-SDK-Type", "go")
+	req.Header.Set("X-SDK-Hash", SDKHash)
 	req.Header.Set("User-Agent", "logs-sdk-go/"+Version)
 
 	resp, err := c.httpClient.Do(req)

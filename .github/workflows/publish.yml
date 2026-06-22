@@ -9,9 +9,14 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+
+      - name: Inject SDK hash from git commit
+        run: sed -i "s/SDKHash = \"local-dev\"/SDKHash = \"${{ github.sha }}\"/" version.go
 
       - name: Trigger pkg.go.dev re-index
         run: |
