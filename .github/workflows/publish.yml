@@ -26,6 +26,15 @@ jobs:
           GOPROXY=https://proxy.golang.org,direct go list -m ${MODULE}@${VERSION}
           echo "Done. https://pkg.go.dev/${MODULE}"
 
+      - name: Create GitHub Release
+        run: |
+          gh release create "${GITHUB_REF#refs/tags/}" \
+            --title "${GITHUB_REF#refs/tags/}" \
+            --generate-notes \
+            --repo ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Notify logs-server
         run: |
           curl -s -X POST https://api.logs.codexs.cn/api/v1/sdk/webhook \
