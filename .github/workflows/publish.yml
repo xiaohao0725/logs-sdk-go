@@ -25,3 +25,10 @@ jobs:
           echo "Refreshing ${MODULE}@${VERSION}..."
           GOPROXY=https://proxy.golang.org,direct go list -m ${MODULE}@${VERSION}
           echo "Done. https://pkg.go.dev/${MODULE}"
+
+      - name: Notify logs-server
+        run: |
+          curl -s -X POST https://api.logs.codexs.cn/api/v1/sdk/webhook \
+            -H "Content-Type: application/json" \
+            -H "X-Webhook-Secret: ${{ secrets.WEBHOOK_SECRET }}" \
+            -d "{\"sdk_type\":\"go\",\"sdk_version\":\"${GITHUB_REF#refs/tags/}\",\"sdk_hash\":\"${{ github.sha }}\"}"
