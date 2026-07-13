@@ -20,6 +20,9 @@ jobs:
       - name: Inject SDK hash from git commit
         run: sed -i "s/SDKHash = \"local-dev\"/SDKHash = \"${{ github.sha }}\"/" version.go
 
+      - name: Sync version from tag
+        run: sed -i "s/Version = \"[^\"]*\"/Version = \"${GITHUB_REF#refs/tags/v}\"/" version.go
+
       - name: Trigger pkg.go.dev re-index
         run: |
           MODULE="github.com/xiaohao0725/logs-sdk-go"
