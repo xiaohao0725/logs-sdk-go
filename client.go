@@ -105,6 +105,54 @@ func (c *Client) Send(entry *LogEntry) {
 
 // Close 优雅关闭客户端，等待所有缓冲日志上报完成。
 // 调用后不可再使用 Send 方法。
+
+// UploadInfraLogs uploads infrastructure logs to the platform.
+func (c *Client) UploadInfraLogs(entries []*InfraLogEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	for _, e := range entries {
+		if e.ProjectSlug == "" {
+			e.ProjectSlug = c.config.ProjectSlug
+		}
+		if e.Host == "" {
+			e.Host = c.hostname
+		}
+		if e.Timestamp == "" {
+			e.Timestamp = time.Now().UTC().Format(time.RFC3339)
+		}
+	}
+	infraEndpoint := strings.Replace(c.config.Endpoint, "/logs", "/infra-logs", 1)
+	body, err := json.Marshal(map[string]interface{}{"logs": entries})
+	if err != nil {
+		return fmt.Errorf("serialize infra logs failed: %w", err)
+	}
+	req, err := http.NewRequestWithContext(context.Background(), "POST", infraEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create HTTP request failed: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", c.config.APIKey)
+	req.Header.Set("X-API-Secret", c.config.APISecret)
+	req.Header.Set("X-SDK-Version", Version)
+	req.Header.Set("X-SDK-Type", "go")
+	req.Header.Set("X-SDK-Hash", SDKHash)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("server returned status code: %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// UploadInfraLog uploads a single infrastructure log entry.
+func (c *Client) UploadInfraLog(entry *InfraLogEntry) error {
+	return c.UploadInfraLogs([]*InfraLogEntry{entry})
+}
+
 func (c *Client) Close() {
 	c.closedMu.Lock()
 	c.closed = true

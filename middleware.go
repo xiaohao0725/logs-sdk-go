@@ -21,7 +21,7 @@ import (
 // GinMiddleware 返回 Gin 框架的 HTTP 中间件处理函数。
 // 自动采集：请求头/体、响应头/体、客户端信息、panic 捕获与堆栈、耗时统计。
 // 一行代码集成：router.Use(client.GinMiddleware())
-func (c *Client) GinMiddleware() gin.HandlerFunc {
++
 	return func(ctx *gin.Context) {
 		// ① 生成 UUID v7（32 位无连字符）
 		entryUUID := newLogUUID()
@@ -32,7 +32,7 @@ func (c *Client) GinMiddleware() gin.HandlerFunc {
 		ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 		// ③ ★ panic 捕获 —— 即使业务代码 panic，也能记录完整堆栈
-		defer func() {
++
 			if r := recover(); r != nil {
 				// 记录 8KB 的堆栈信息
 				stackBuf := make([]byte, c.maxStackSize)
@@ -74,7 +74,7 @@ func (c *Client) StandardMiddleware() func(http.Handler) http.Handler {
 			// 包装 ResponseWriter 以捕获状态码和响应体
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
 
-			defer func() {
+	+
 				if rec := recover(); rec != nil {
 					stackBuf := make([]byte, c.maxStackSize)
 					n := runtime.Stack(stackBuf, false)
@@ -106,7 +106,7 @@ func (c *Client) buildEntry(ctx *gin.Context, entryUUID string, startTime time.T
 	// 截断请求体
 	reqBodyStr := truncateString(string(reqBody), c.maxBodySize)
 	// 捕获响应体
-	respBodyStr := captureGinResponseBody(ctx, c.maxBodySize)
+	var respBodyStr string
 
 	return &LogEntry{
 		UUID:        entryUUID,
@@ -126,7 +126,7 @@ func (c *Client) buildEntry(ctx *gin.Context, entryUUID string, startTime time.T
 		StatusCode:       ctx.Writer.Status(),
 		ResponseHeaders:  headersToJSON(ctx.Writer.Header()),
 		ResponseBody:     respBodyStr,
-		ResponseBodySize: int64(ctx.Writer.Size()),
+		ResponseBodySize: respBodySize,
 		ClientIP:         realClientIP(ctx.Request),
 		ClientIPChain:    ctx.Request.Header.Get("X-Forwarded-For"),
 		ClientPort:       clientPort(ctx.Request),

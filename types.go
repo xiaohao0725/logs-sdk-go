@@ -123,3 +123,20 @@ type LogEntry struct {
 	// ── 自定义扩展 ──
 	Tags map[string]interface{} `json:"tags"` // 自定义标签
 }
+
+// InfraLogEntry represents an infrastructure/middleware log entry.
+type InfraLogEntry struct {
+	UUID           string `json:"uuid"`
+	Timestamp      string `json:"timestamp"`
+	ProjectSlug    string `json:"project_slug"`
+	SourceType     string `json:"source_type"`
+	SourceName     string `json:"source_name"`
+	Host           string `json:"host"`
+	Level          string `json:"level"`
+	Message        string `json:"message"`
+	Metadata       string `json:"metadata"`
+	TraceID        string `json:"trace_id"`
+	RelatedAPIUUID string `json:"related_api_uuid"`
+	IsError        bool   `json:"is_error"`
+	ErrorDetail    string `json:"error_detail"`
+}
