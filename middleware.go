@@ -57,6 +57,9 @@ func (c *Client) GinMiddleware() gin.HandlerFunc {
 			entry.IsError = true
 			entry.ErrorType = "http_error"
 			entry.ErrorMessage = entry.ResponseBody
+			if entry.StatusCode >= 500 {
+				entry.ErrorStack = captureStack(1)
+			}
 		}
 		c.Send(entry) // 异步发送
 	}
@@ -97,6 +100,9 @@ func (c *Client) StandardMiddleware() func(http.Handler) http.Handler {
 				entry.IsError = true
 				entry.ErrorType = "http_error"
 				entry.ErrorMessage = entry.ResponseBody
+				if entry.StatusCode >= 500 {
+					entry.ErrorStack = captureStack(1)
+				}
 			}
 			c.Send(entry)
 		})
