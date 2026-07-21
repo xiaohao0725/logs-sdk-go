@@ -53,9 +53,10 @@ func (c *Client) GinMiddleware() gin.HandlerFunc {
 
 		// ⑤ 正常响应：构建完整日志条目
 		entry := c.buildEntry(ctx, entryUUID, startTime, bodyBytes)
-		if entry.StatusCode >= 500 {
+		if entry.StatusCode >= 400 {
 			entry.IsError = true
 			entry.ErrorType = "http_error"
+			entry.ErrorMessage = entry.ResponseBody
 		}
 		c.Send(entry) // 异步发送
 	}
@@ -92,9 +93,10 @@ func (c *Client) StandardMiddleware() func(http.Handler) http.Handler {
 			next.ServeHTTP(wrapped, r)
 
 			entry := c.buildStandardEntry(r, wrapped, entryUUID, startTime, bodyBytes)
-			if entry.StatusCode >= 500 {
+			if entry.StatusCode >= 400 {
 				entry.IsError = true
 				entry.ErrorType = "http_error"
+				entry.ErrorMessage = entry.ResponseBody
 			}
 			c.Send(entry)
 		})
