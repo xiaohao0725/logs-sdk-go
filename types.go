@@ -44,6 +44,28 @@ type Config struct {
 	MaxStackSize int `json:"max_stack_size"`
 }
 
+// IngestResponse 服务端日志上报同步响应体。
+// sendBatch 解析服务端 JSON 响应后返回此结构体。
+type IngestResponse struct {
+	Received int      `json:"received"` // 接收到的日志数量
+	UUIDs    []string `json:"uuids"`    // 服务端确认收到的日志 UUID 列表
+	BatchID  string   `json:"batch_id"` // 批次追踪 ID，用于查询处理状态或匹配 Webhook 回调
+}
+
+// CallbackItem 单条日志处理结果，由 Webhook 回调推送。
+type CallbackItem struct {
+	UUID   string `json:"uuid"`   // 日志 UUID（与 SDK 生成的一致）
+	UID    uint64 `json:"uid"`    // 服务端分配的内部顺序 ID（0 表示未分配）
+	Status string `json:"status"` // 处理状态：persisted / deduplicated / invalid
+}
+
+// LogPersistedEvent 日志持久化完成事件，Webhook 回调的 data 字段。
+type LogPersistedEvent struct {
+	BatchID string         `json:"batch_id"`
+	Total   int            `json:"total"`
+	Items   []CallbackItem `json:"items"`
+}
+
 // DefaultConfig 返回默认配置值。
 func DefaultConfig() Config {
 	return Config{

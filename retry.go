@@ -40,6 +40,31 @@ func retryWithBackoff(ctx context.Context, cfg retryConfig, fn func() error) err
 	return lastErr
 }
 
+// retrySendBatch 与 retryWithBackoff 类似，但适配 sendBatch 的新签名。
+func retrySendBatch(ctx context.Context, cfg retryConfig, fn func() (*IngestResponse, error)) (*IngestResponse, error) {
+	var lastResp *IngestResponse
+	var lastErr error
+	for attempt := 0; attempt <= cfg.maxRetries; attempt++ {
+		if attempt > 0 {
+			delay := time.Duration(math.Min(
+				float64(cfg.baseDelay)*math.Pow(2, float64(attempt-1)),
+				float64(cfg.maxDelay),
+			))
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+
+		lastResp, lastErr = fn()
+		if lastErr == nil {
+			return lastResp, nil
+		}
+	}
+	return lastResp, lastErr
+}
+
 // defaultRetryConfig 返回 SDK 默认重试配置。
 func defaultRetryConfig() retryConfig {
 	return retryConfig{

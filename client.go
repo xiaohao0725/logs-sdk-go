@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -165,7 +166,7 @@ func (c *Client) Close() {
 	// 最终刷新剩余日志
 	remaining := c.buffer.flush()
 	if len(remaining) > 0 {
-		if err := c.sendBatch(remaining); err != nil {
+		if _, err := c.sendBatch(remaining); err != nil {
 			log.Printf("[logs-sdk] 关闭时上报失败 (数量=%d): %v — 保存到离线缓存", len(remaining), err)
 			c.offlineCache.Save(remaining)
 		}
@@ -173,6 +174,17 @@ func (c *Client) Close() {
 
 	// 尝试重传离线缓存
 	c.FlushOffline()
+}
+
+// SendWithReceipt 同步发送一条日志并等待服务端响应，返回包含 batch_id 的回执。
+// 与 Send() 不同，此方法不经过缓冲区，直接发送并等待响应，适合需要即时拿到日志 ID 的场景。
+func (c *Client) SendWithReceipt(entry *LogEntry) (*IngestResponse, error) {
+	entry.Host = c.hostname
+	entry.ProcessID = c.pid
+	entry.Environment = c.config.Environment
+	entry.ProjectSlug = c.config.ProjectSlug
+	entry.ServiceName = c.config.ServiceName
+	return c.sendBatch([]*LogEntry{entry})
 }
 
 // ──────────────── 内部方法 ────────────────
@@ -203,7 +215,7 @@ func (c *Client) flushEntries(entries []*LogEntry) {
 	retryCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := retryWithBackoff(retryCtx, defaultRetryConfig(), func() error {
+	_, err := retrySendBatch(retryCtx, defaultRetryConfig(), func() (*IngestResponse, error) {
 		return c.sendBatch(entries)
 	})
 	if err != nil {
@@ -216,12 +228,13 @@ func (c *Client) flushEntries(entries []*LogEntry) {
 }
 
 // sendBatch 通过 HTTP POST 发送批量日志到 Ingestion API。
-func (c *Client) sendBatch(entries []*LogEntry) error {
+// ★ 增强：解析服务端响应体，返回 IngestResponse（含 UUID 列表和 batch_id）。
+func (c *Client) sendBatch(entries []*LogEntry) (*IngestResponse, error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"logs": entries,
 	})
 	if err != nil {
-		return fmt.Errorf("序列化日志失败: %w", err)
+		return nil, fmt.Errorf("序列化日志失败: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(
@@ -231,7 +244,7 @@ func (c *Client) sendBatch(entries []*LogEntry) error {
 		bytes.NewReader(body),
 	)
 	if err != nil {
-		return fmt.Errorf("创建 HTTP 请求失败: %w", err)
+		return nil, fmt.Errorf("创建 HTTP 请求失败: %w", err)
 	}
 
 	// 设置认证头和 Content-Type
@@ -245,15 +258,29 @@ func (c *Client) sendBatch(entries []*LogEntry) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("HTTP 请求失败: %w", err)
+		return nil, fmt.Errorf("HTTP 请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("服务端返回异常状态码: %d", resp.StatusCode)
+	// ★ 解析服务端 JSON 响应体，提取 UUID 列表和 batch_id
+	var apiResp struct {
+		Code    int              `json:"code"`
+		Message string           `json:"message"`
+		Data    IngestResponse   `json:"data"`
+	}
+	if decodeErr := json.NewDecoder(resp.Body).Decode(&apiResp); decodeErr != nil {
+		// 响应体无法解析（可能是旧版服务端），回退到仅检查状态码
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			return nil, fmt.Errorf("服务端返回异常状态码: %d", resp.StatusCode)
+		}
+		return &IngestResponse{Received: len(entries)}, nil
 	}
 
-	return nil
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("服务端返回异常: code=%d message=%s", apiResp.Code, apiResp.Message)
+	}
+
+	return &apiResp.Data, nil
 }
 
 // mergeConfig 合并用户配置与默认值。

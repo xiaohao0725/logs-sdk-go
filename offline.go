@@ -58,8 +58,8 @@ func (c *OfflineCache) Save(entries []*LogEntry) error {
 }
 
 // FlushAll 读取所有离线缓存文件，通过回调发送，成功则删除。
-// sendFn 为发送函数（通常是 Client.sendBatch）。
-func (c *OfflineCache) FlushAll(sendFn func([]*LogEntry) error) error {
+// sendFn 为发送函数（通常是 Client.sendBatch），返回 IngestResponse 或错误。
+func (c *OfflineCache) FlushAll(sendFn func([]*LogEntry) (*IngestResponse, error)) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -95,7 +95,7 @@ func (c *OfflineCache) FlushAll(sendFn func([]*LogEntry) error) error {
 		}
 
 		// 尝试发送
-		if err := sendFn(entries); err != nil {
+		if _, err := sendFn(entries); err != nil {
 			log.Printf("[logs-sdk] 离线缓存重传失败: %s (%v)", file, err)
 			return err // 保留文件，下次重试
 		}
