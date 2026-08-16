@@ -119,6 +119,9 @@ type LogEntry struct {
 	ErrorStack    string `json:"error_stack"`     // ★ 完整错误堆栈（限制 8KB）
 	PanicLocation string `json:"panic_location"`  // ★ panic 位置（函数名+文件+行号）
 
+	// 回调标记：请求由平台回调通知触发（X-Logs-Event 头或 logs-server-callback/ UA）
+	IsCallback bool `json:"is_callback"`
+
 	// ── 关联与追踪 ──
 	TraceID      string `json:"trace_id"`       // W3C Trace Context
 	SpanID       string `json:"span_id"`        // 当前 Span ID

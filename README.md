@@ -21,7 +21,7 @@
 ## 安装
 
 ```bash
-go get github.com/xiaohao0725/logs-sdk-go@v0.3.0
+go get github.com/xiaohao0725/logs-sdk-go@v0.6.0
 ```
 
 要求 Go 1.22+。

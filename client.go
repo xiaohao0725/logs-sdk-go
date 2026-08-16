@@ -116,6 +116,9 @@ func (c *Client) UploadInfraLogs(entries []*InfraLogEntry) error {
 		if e.ProjectSlug == "" {
 			e.ProjectSlug = c.config.ProjectSlug
 		}
+		if e.UUID == "" {
+			e.UUID = newLogUUID()
+		}
 		if e.Host == "" {
 			e.Host = c.hostname
 		}
