@@ -159,6 +159,7 @@ func (c *Client) buildEntry(ctx *gin.Context, entryUUID string, startTime time.T
 		Referer:          ctx.Request.Header.Get("Referer"),
 		LatencyBreakdown: "{}",
 		RequestID:        entryUUID[:8],
+		IsCallback:       isCallbackRequest(ctx.Request),
 	}
 }
 
@@ -206,6 +207,7 @@ func (c *Client) buildStandardEntry(r *http.Request, w *responseWriter, entryUUI
 		Referer:          r.Header.Get("Referer"),
 		LatencyBreakdown: "{}",
 		RequestID:        entryUUID[:8],
+		IsCallback:       isCallbackRequest(r),
 	}
 }
 
@@ -215,6 +217,18 @@ func (c *Client) buildStandardEntry(r *http.Request, w *responseWriter, entryUUI
 func newLogUUID() string {
 	id, _ := uuid.NewV7()
 	return strings.ReplaceAll(id.String(), "-", "")
+}
+
+// isCallbackRequest 判断请求是否由平台回调通知触发。
+// 识别标准：携带 X-Logs-Event 请求头，或 User-Agent 以 logs-server-callback/ 开头。
+func isCallbackRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.Header.Get("X-Logs-Event") != "" {
+		return true
+	}
+	return strings.HasPrefix(r.UserAgent(), "logs-server-callback/")
 }
 
 // schemeOf 检测请求使用的协议（http/https）。
